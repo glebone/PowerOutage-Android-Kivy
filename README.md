@@ -151,3 +151,17 @@ If you are building a release version of the APK, you need to sign it:
 2. **Install the APK**:
    ```bash
    adb install ./bin/myapp-release.apk
+
+
+
+
+    ** Download bundletools
+https://github.com/google/bundletool/releases
+
+```bash
+java -jar bundletool-all.jar build-apks --bundle=./bin/moonphase-0.1.aab --output=./bin/moonphase.apks --mode=universal --ks=my-release-key.keystore --ks-key-alias=my-key-alias --ks-pass=pass:your_keystore_password
+```
+
+```bash 
+unzip ./bin/moonphase.apks -d ./bin/extracted_apks
+```
