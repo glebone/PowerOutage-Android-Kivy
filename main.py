@@ -203,7 +203,7 @@ class PowerOutageApp(App):
                     hours[i] = 1
 
         labels = [f"{i:02d}:00" for i in range(24)]
-        colors = ['red' if h == 1 else 'green' for h in hours]
+        colors = ['red' if h == 1 else 'white' for h in hours]
 
         plt.figure(figsize=(6, 6))
         plt.pie([1]*24, labels=labels, colors=colors, startangle=90, counterclock=False)
