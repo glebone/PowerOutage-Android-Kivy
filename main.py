@@ -12,7 +12,7 @@ import re
 import logging
 from datetime import datetime
 import matplotlib
-matplotlib.use('Agg')  
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from io import BytesIO
 from kivy.core.image import Image as CoreImage
@@ -105,15 +105,24 @@ class PowerOutageApp(App):
         logging.debug(message)
 
     def parse_outage_schedule(self, text):
-        pattern = re.compile(r'■ (\d{2}:\d{2})-(\d{2}:\d{2}) ((?:\d черга)|(?:\d та \д черги)|(?:\д та \д черга))')
+        pattern = re.compile(r'■ (\d{2}:\d{2})-(\d{2}:\d{2}) ((?:\d черга)|(?:\d та \d черги)|(?:\д та \д черга))')
         matches = pattern.findall(text)
         schedule = [(f"{start}-{end}", group) for start, end, group in matches]
         logging.debug(f"Parsed schedule: {schedule}")
         return schedule
 
     def filter_schedule(self, schedule, queue):
-        queue_pattern = re.compile(rf"\b{queue}(?: черга| та {queue} черги)\b")
-        filtered_schedule = [item for item in schedule if queue_pattern.search(item[1])]
+        """
+        Filters the schedule to include all events that match the selected queue.
+        It also splits multiple queue events like '1 та 2 черги' and includes them for each queue.
+        """
+        filtered_schedule = []
+        for time_range, group in schedule:
+            # Extract all queues in the event (e.g., '1 та 2 черги' -> ['1', '2'])
+            queues_in_group = re.findall(r'\d+', group)
+            if str(queue) in queues_in_group:
+                filtered_schedule.append((time_range, group))
+        
         logging.debug(f"Filtered schedule for Queue {queue}: {filtered_schedule}")
         return filtered_schedule
 
@@ -188,26 +197,31 @@ class PowerOutageApp(App):
             if end_time_str == '24:00':
                 end_hour = 24
 
+            # Mark the hours when power outages are expected
             if start_hour < end_hour:
                 for i in range(start_hour, end_hour):
                     hours[i] = 1
             else:
+                # Handle cases when the time range crosses midnight
                 for i in range(start_hour, 24):
                     hours[i] = 1
                 for i in range(0, end_hour):
                     hours[i] = 1
 
+        # Labels and colors for the chart
         labels = [f"{i:02d}:00" for i in range(24)]
         colors = ['red' if h == 1 else 'white' for h in hours]
 
         plt.figure(figsize=(6, 6))
-        plt.pie([1]*24, labels=labels, colors=colors, startangle=90, counterclock=False)
+
+        # Adjust the starting angle and direction of the pie chart
+        plt.pie([1] * 24, labels=labels, colors=colors, startangle=90, counterclock=False)
         plt.title(f'Power Outage Schedule for Queue {queue} on {event_date}')
 
+        # Save the chart as a PNG image and display it in a popup
         buf = BytesIO()
         plt.savefig(buf, format='png')
         buf.seek(0)
-
         im = CoreImage(buf, ext='png')
         self.show_image_popup(im)
 
@@ -220,3 +234,4 @@ class PowerOutageApp(App):
 
 if __name__ == '__main__':
     PowerOutageApp().run()
+            
