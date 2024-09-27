@@ -6,24 +6,19 @@ from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.popup import Popup
 from kivy.uix.image import Image
-from kivy.core.window import Window
-from kivy.clock import mainthread
+from kivy.clock import Clock, mainthread
 import threading
 import re
 import logging
-from datetime import datetime, timedelta
-
-# Import matplotlib and configure it for use with Kivy
+from datetime import datetime
 import matplotlib
-matplotlib.use('Agg')  # Use the Anti-Grain Geometry backend (no UI)
+matplotlib.use('Agg')  
 import matplotlib.pyplot as plt
 from io import BytesIO
 from kivy.core.image import Image as CoreImage
 
-# Set up logging
 logging.basicConfig(level=logging.DEBUG)
 
-# Default text in Ukrainian for the multiline input, representing a sample power outage schedule.
 default_text = """
 ❗️💡Черкащина. Відповідно до команди НЕК "Укренерго", в неділю, 1 вересня, в області будуть застосовані графіки погодинних відключень електроенергії.
 
@@ -57,12 +52,15 @@ default_text = """
 class PowerOutageApp(App):
     def build(self):
         self.title = "Power Outage Schedule"
-
-        # Main layout
         layout = BoxLayout(orientation='vertical', spacing=10, padding=10)
 
-        # Text Input
-        self.text_input = TextInput(text=default_text, multiline=True, size_hint=(1, 0.7))
+        # Set background color for TextInput to ensure visibility
+        self.text_input = TextInput(
+            multiline=True,
+            size_hint=(1, 0.7),
+            foreground_color=(0, 0, 0, 1),  # Text color black
+            background_color=(1, 1, 1, 1)  # Background color white
+        )
         layout.add_widget(self.text_input)
 
         # Queue Selector
@@ -93,14 +91,21 @@ class PowerOutageApp(App):
         self.status_label = Label(text='', size_hint=(1, 0.1))
         layout.add_widget(self.status_label)
 
+        # Schedule setting the text after the app is fully built
+        Clock.schedule_once(self.set_default_text, 0.1)
+
         return layout
+
+    def set_default_text(self, dt):
+        """Set the default text after a delay to ensure the layout is built."""
+        self.text_input.text = default_text
 
     def update_status(self, message):
         self.status_label.text = message
         logging.debug(message)
 
     def parse_outage_schedule(self, text):
-        pattern = re.compile(r'■ (\d{2}:\d{2})-(\d{2}:\d{2}) ((?:\d черга)|(?:\d та \d черги)|(?:\d та \d черга))')
+        pattern = re.compile(r'■ (\d{2}:\d{2})-(\d{2}:\d{2}) ((?:\d черга)|(?:\d та \д черги)|(?:\д та \д черга))')
         matches = pattern.findall(text)
         schedule = [(f"{start}-{end}", group) for start, end, group in matches]
         logging.debug(f"Parsed schedule: {schedule}")
@@ -113,7 +118,6 @@ class PowerOutageApp(App):
         return filtered_schedule
 
     def extract_date_from_text(self, text):
-        # Mapping of Ukrainian month names to month numbers
         month_mapping = {
             'січня': 1,
             'лютого': 2,
@@ -148,42 +152,33 @@ class PowerOutageApp(App):
             self.update_status("Date not found in text.")
             logging.debug("Date not found in text.")
 
-        # Fallback to current date
         return datetime.now().date()
 
     def on_add_to_calendar_clicked(self, instance):
         threading.Thread(target=self.add_to_calendar).start()
 
     def add_to_calendar(self):
-        # Retrieve the text and queue
         text = self.text_input.text
         queue = int(self.queue_spinner.text.split()[1])
         event_date = self.extract_date_from_text(text)
 
-        # Parse and filter the schedule
         schedule = self.parse_outage_schedule(text)
         filtered_schedule = self.filter_schedule(schedule, queue)
 
-        # For demonstration, we'll just update the status with the number of events
         events_count = len(filtered_schedule)
         self.update_status(f"Total events for Queue {queue}: {events_count}")
-
-        # TODO: Integrate Google Calendar API securely if needed
 
     def on_draw_chart_clicked(self, instance):
         threading.Thread(target=self.draw_chart).start()
 
     def draw_chart(self):
-        # Retrieve the text and queue
         text = self.text_input.text
         queue = int(self.queue_spinner.text.split()[1])
         event_date = self.extract_date_from_text(text)
 
-        # Parse and filter the schedule
         schedule = self.parse_outage_schedule(text)
         filtered_schedule = self.filter_schedule(schedule, queue)
 
-        # Prepare data for the chart
         hours = [0] * 24
         for time_range, _ in filtered_schedule:
             start_time_str, end_time_str = time_range.split('-')
