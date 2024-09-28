@@ -16,8 +16,13 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from io import BytesIO
 from kivy.core.image import Image as CoreImage
+import platform
 
 logging.basicConfig(level=logging.DEBUG)
+
+# Conditional import for plyer.share (only on supported platforms)
+if platform.system() == 'Android':
+    from plyer import share
 
 default_text = """
 ❗️💡Черкащина. Відповідно до команди НЕК "Укренерго", в неділю, 1 вересня, в області будуть застосовані графіки погодинних відключень електроенергії.
@@ -85,6 +90,12 @@ class PowerOutageApp(App):
         draw_button.bind(on_press=self.on_draw_chart_clicked)
         buttons_layout.add_widget(draw_button)
 
+        # Add Share Button only if on Android
+        if platform.system() == 'Android':
+            share_button = Button(text='Share Chart')
+            share_button.bind(on_press=self.on_share_clicked)
+            buttons_layout.add_widget(share_button)
+
         layout.add_widget(buttons_layout)
 
         # Status Label
@@ -105,7 +116,7 @@ class PowerOutageApp(App):
         logging.debug(message)
 
     def parse_outage_schedule(self, text):
-        pattern = re.compile(r'■ (\d{2}:\d{2})-(\d{2}:\d{2}) ((?:\d черга)|(?:\d та \d черги)|(?:\д та \д черга))')
+        pattern = re.compile(r'■ (\d{2}:\d{2})-(\d{2}:\d{2}) ((?:\d черга)|(?:\д та \д черги)|(?:\д та \д черга))')
         matches = pattern.findall(text)
         schedule = [(f"{start}-{end}", group) for start, end, group in matches]
         logging.debug(f"Parsed schedule: {schedule}")
@@ -122,7 +133,7 @@ class PowerOutageApp(App):
             queues_in_group = re.findall(r'\d+', group)
             if str(queue) in queues_in_group:
                 filtered_schedule.append((time_range, group))
-        
+
         logging.debug(f"Filtered schedule for Queue {queue}: {filtered_schedule}")
         return filtered_schedule
 
@@ -222,6 +233,8 @@ class PowerOutageApp(App):
         buf = BytesIO()
         plt.savefig(buf, format='png')
         buf.seek(0)
+        self.chart_image_data = buf.getvalue()  # Save chart image data to share later
+
         im = CoreImage(buf, ext='png')
         self.show_image_popup(im)
 
@@ -232,6 +245,15 @@ class PowerOutageApp(App):
         popup.content = img_widget
         popup.open()
 
+    def on_share_clicked(self, instance):
+        """Share the generated chart via Android's share dialog."""
+        # Save the chart to a file
+        chart_filename = '/storage/emulated/0/Download/power_outage_chart.png'
+        with open(chart_filename, 'wb') as f:
+            f.write(self.chart_image_data)
+
+        # Use plyer to open the Android share dialog
+        share.share(filepath=chart_filename, title="Power Outage Chart")
+
 if __name__ == '__main__':
     PowerOutageApp().run()
-            
